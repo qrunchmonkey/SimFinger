@@ -25,6 +25,9 @@
 	IBOutlet NSPanel *setTextPanel;
 	IBOutlet NSTextField *setTextLabel;
 	IBOutlet NSTextField *setTextField;
+	
+	BOOL capsLocked;
+	BOOL keepPointerInWindow;
 }
 
 - (AXUIElementRef)simulatorApplication;
@@ -42,4 +45,6 @@
 
 - (IBAction)installFakeApps:(id)sender;
 
+- (IBAction)keepPointerInWindow:(id)sender;
+- (void)checkModiferKeys;
 @end

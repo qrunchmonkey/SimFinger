@@ -17,6 +17,15 @@ void WindowFrameDidChangeCallback( AXObserverRef observer, AXUIElementRef elemen
 
 @implementation FakeFingerAppDelegate
 
+- (void)checkModiferKeys {
+	if (!capsLocked && alphaLock & GetCurrentKeyModifiers()) {
+		[[pointerOverlay animator] setValue:[NSNumber numberWithFloat:0] forKey:@"alphaValue"];
+		capsLocked = YES;
+	}else {
+		[[pointerOverlay animator] setValue:[NSNumber numberWithFloat:1] forKey:@"alphaValue"];
+		capsLocked = NO;
+	}
+}
 
 - (void)registerForSimulatorWindowResizedNotification {
 	// this methode is leaking ...
@@ -50,7 +59,7 @@ void WindowFrameDidChangeCallback( AXObserverRef observer, AXUIElementRef elemen
 		
 		for(NSDictionary *application in applications)
 		{
-			if([[application objectForKey:@"NSApplicationName"] isEqualToString:@"iPhone Simulator"])
+			if([[application objectForKey:@"NSApplicationName"] isEqualToString:@"iPhone Simulator"] || [[application objectForKey:@"NSApplicationName"] isEqualToString:@"iOS Simulator"])
 			{
 				pid_t pid = (pid_t)[[application objectForKey:@"NSApplicationProcessIdentifier"] integerValue];
 				
@@ -98,7 +107,7 @@ void WindowFrameDidChangeCallback( AXObserverRef observer, AXUIElementRef elemen
 			AXValueGetValue(sizeValue, kAXValueCGSizeType, (void *)&size);
 			
 			BOOL supportedSize = NO;
-			if((int)size.width == 386 && (int)size.height == 742)
+			if((int)size.width == 368 && (int)size.height == 716)
 			{
 				[hardwareOverlay setContentSize:NSMakeSize(634, 985)];
 				[hardwareOverlay setBackgroundColor:[NSColor colorWithPatternImage:[NSImage imageNamed:@"iPhoneFrame"]]];
@@ -107,8 +116,20 @@ void WindowFrameDidChangeCallback( AXObserverRef observer, AXUIElementRef elemen
 				[fadeOverlay setBackgroundColor:[NSColor colorWithPatternImage:[NSImage imageNamed:@"FadeFrame"]]];
 				
 				supportedSize = YES;
+				if (supportedSize) {
+					Boolean settable;
+					AXUIElementIsAttributeSettable(subElement, kAXPositionAttribute, &settable);
+					
+					CGPoint point;
+					point.x = 130;
+					point.y = screenRect.size.height - size.height - 148;
+					AXValueRef pointValue = AXValueCreate(kAXValueCGPointType, &point);
+					
+					AXUIElementSetAttributeValue(subElement, kAXPositionAttribute, (CFTypeRef)pointValue);
+				}	
 				
-			} else if((int)size.width == 742 && (int)size.height == 386) {
+				
+			} else if((int)size.width == 716 && (int)size.height == 368) {
 				[hardwareOverlay setContentSize:NSMakeSize(985,634)];
 				[hardwareOverlay setBackgroundColor:[NSColor colorWithPatternImage:[NSImage imageNamed:@"iPhoneFrameLandscape_right"]]];
 				
@@ -116,19 +137,20 @@ void WindowFrameDidChangeCallback( AXObserverRef observer, AXUIElementRef elemen
 				[fadeOverlay setBackgroundColor:[NSColor colorWithPatternImage:[NSImage imageNamed:@"FadeFrameLandscape"]]];
 				
 				supportedSize = YES;
+				if (supportedSize) {
+					Boolean settable;
+					AXUIElementIsAttributeSettable(subElement, kAXPositionAttribute, &settable);
+					
+					CGPoint point;
+					point.x = 134;
+					point.y = screenRect.size.height - size.height - 144;
+					AXValueRef pointValue = AXValueCreate(kAXValueCGPointType, &point);
+					
+					AXUIElementSetAttributeValue(subElement, kAXPositionAttribute, (CFTypeRef)pointValue);
+				}	
 			}
 			
-			if (supportedSize) {
-				Boolean settable;
-				AXUIElementIsAttributeSettable(subElement, kAXPositionAttribute, &settable);
-				
-				CGPoint point;
-				point.x = 121;
-				point.y = screenRect.size.height - size.height - 135;
-				AXValueRef pointValue = AXValueCreate(kAXValueCGPointType, &point);
-				
-				AXUIElementSetAttributeValue(subElement, kAXPositionAttribute, (CFTypeRef)pointValue);
-			}							
+									
 			
 		}
 	}
@@ -283,12 +305,48 @@ enum {
 }
 
 
-
+- (IBAction)keepPointerInWindow:(id)sender {
+	NSMenuItem *item = (NSMenuItem*)sender;
+	keepPointerInWindow = !keepPointerInWindow;
+	[item setState:keepPointerInWindow];
+	NSLog(@"Keep pointer in window");
+}
 
 - (void)_updateWindowPosition
 {
 	NSPoint p = [NSEvent mouseLocation];
-	[pointerOverlay setFrameOrigin:NSMakePoint(p.x - 25, p.y - 25)];
+	NSPoint constrainedPoint = NSMakePoint(p.x - 25, p.y - 25);
+	NSRect simFrame = [[hardwareOverlay contentView]frame];
+	
+	if (keepPointerInWindow) {
+		if (simFrame.size.height == 985) { //portrit
+			if (constrainedPoint.x < simFrame.origin.x + 155) {
+				constrainedPoint.x = simFrame.origin.x + 155;
+			}else if (constrainedPoint.x > simFrame.origin.x + 425) {
+				constrainedPoint.x = simFrame.origin.x + 425;
+			}
+			
+			if (constrainedPoint.y < simFrame.origin.y + 265) {
+				constrainedPoint.y = simFrame.origin.y + 265;
+			}else if (constrainedPoint.y > simFrame.origin.y + 695) {
+				constrainedPoint.y = simFrame.origin.y + 695;
+			}
+		}else { //landscape
+			if (constrainedPoint.x < simFrame.origin.x + 250) {
+				constrainedPoint.x = simFrame.origin.x + 250;
+			}else if (constrainedPoint.x > simFrame.origin.x + 685) {
+				constrainedPoint.x = simFrame.origin.x + 685;
+			}
+			
+			if (constrainedPoint.y < simFrame.origin.y + 160) {
+				constrainedPoint.y = simFrame.origin.y + 160;
+			}else if (constrainedPoint.y > simFrame.origin.y + 440) {
+				constrainedPoint.y = simFrame.origin.y + 440;
+			}
+		}
+	}
+	
+	[pointerOverlay setFrameOrigin:constrainedPoint];
 }
 
 - (void)mouseDown
@@ -362,6 +420,16 @@ CGEventRef tapCallBack(CGEventTapProxy proxy, CGEventType type, CGEventRef event
 	return event;
 }
 
+
+CGEventRef keyFlagsTapCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *info)
+{
+	FakeFingerAppDelegate *delegate = (FakeFingerAppDelegate *)info;
+	[delegate checkModiferKeys];
+	return event;
+	
+}
+
+
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
 	hardwareOverlay = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 634, 985) styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:NO];
@@ -392,25 +460,36 @@ CGEventRef tapCallBack(CGEventTapProxy proxy, CGEventType type, CGEventRef event
 	[fadeOverlay orderFront:nil];
 	
 	CGEventMask mask =	CGEventMaskBit(kCGEventLeftMouseDown) | 
-						CGEventMaskBit(kCGEventLeftMouseUp) | 
-						CGEventMaskBit(kCGEventLeftMouseDragged) | 
-						CGEventMaskBit(kCGEventMouseMoved);
-
-	CFMachPortRef tap = CGEventTapCreate(kCGAnnotatedSessionEventTap,
-									kCGTailAppendEventTap,
-									kCGEventTapOptionListenOnly,
-									mask,
-									tapCallBack,
-									self);
+	CGEventMaskBit(kCGEventLeftMouseUp) | 
+	CGEventMaskBit(kCGEventLeftMouseDragged) | 
+	CGEventMaskBit(kCGEventMouseMoved);
 	
+	CFMachPortRef tap = CGEventTapCreate(kCGAnnotatedSessionEventTap,
+										 kCGTailAppendEventTap,
+										 kCGEventTapOptionListenOnly,
+										 mask,
+										 tapCallBack,
+										 self);
 	CFRunLoopSourceRef runLoopSource = CFMachPortCreateRunLoopSource(NULL, tap, 0);
+	
 	CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, kCFRunLoopCommonModes);
+	
+	CFMachPortRef tap2 = CGEventTapCreate(kCGAnnotatedSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionListenOnly,
+										  CGEventMaskBit(kCGEventFlagsChanged), keyFlagsTapCallback, self);
+	CFRunLoopSourceRef src = CFMachPortCreateRunLoopSource(NULL, tap2, 0);
+    CFRunLoopAddSource(CFRunLoopGetMain(), src, kCFRunLoopCommonModes);
+    CFRelease(src);
+	
 	
 	CFRelease(runLoopSource);
 	CFRelease(tap);
+	CFRelease(tap2);
 	
 	[self registerForSimulatorWindowResizedNotification];
 	[self positionSimulatorWindow:nil];
+	[self checkModiferKeys];
+
+	
 }
 
 @end
