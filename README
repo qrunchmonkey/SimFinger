@@ -10,3 +10,9 @@ AWESOME SCREENCASTS
 Step 3.
 
 Enjoy, fork away, email loren.brichter@atebits.com when you make it moar better and want me to check out your changes.
+
+Step 4.
+
+I've added a few new features to SimFinger that we needed over here at Improbable Sciences. 
+Activating Caps Lock will hide the 'finger' while you're recording with a nice fade in/fade out animation.
+Additionally, you can constrain the pointer overlay to the iPhone's screen.
